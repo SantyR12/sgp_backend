@@ -75,6 +75,7 @@ services:
       MAIL_PASS:  tu_password_mailtrap
       MAIL_FROM:  noreply@sgp.com
 
+
       FRONTEND_URL:        http://localhost:3000
       OTP_EXPIRES_MINUTES: 5
 

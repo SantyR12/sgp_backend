@@ -13,7 +13,7 @@ VALUES (
   'a0000000-0000-0000-0000-000000000001',
   'Administrador Sistema',
   'admin@sgp.com',
-  '$2a$12$LQv3c1yqBwEHFQWkADqHt.sMtSoF1OcPvEE4UNRHhHjVTZYnrmQqK',
+  '$2a$12$nFHJIQasT8JwEgMyICjAQubhUkciO2750RfWCl670G81ios5fUcAC',
   'admin',
   'activo'
 )
@@ -28,7 +28,7 @@ VALUES (
   'a0000000-0000-0000-0000-000000000002',
   'Dr. Juan López',
   'medico@sgp.com',
-  '$2a$12$mH3QBW3IjUwDwnRhh3jB7OsFwXvqtBvJOHW6VZlJfBb0Z82IvF0Cq',
+  '$2a$12$EMoPUShYxwm3tZM1wP4bxun.AkqyCO88mVc7DOxLfqGjBBws/rRVO',
   'medico',
   'activo'
 )
@@ -43,7 +43,7 @@ VALUES (
   'a0000000-0000-0000-0000-000000000003',
   'Enf. María Torres',
   'enfermera@sgp.com',
-  '$2a$12$j9l.H3LvY3e5XJFxW.9oV.lqJJWN7H4XH2hT3ULzn7V9JQf4FZbOi',
+  '$2a$12$KFiR34fSKMFwGzeq0wzIhOsf/Sdrd87Ek/xCFUxSZ1/ztQmr0V5MK',
   'enfermero',
   'activo'
 )
