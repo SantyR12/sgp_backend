@@ -1,0 +1,90 @@
+version: "3.9"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SGP — Docker Compose
+# Levanta PostgreSQL + Backend con un solo comando:
+#   docker compose up
+#
+# Para bajar todo:
+#   docker compose down
+#
+# Para bajar Y borrar la base de datos:
+#   docker compose down -v
+# ══════════════════════════════════════════════════════════════════════════════
+
+services:
+
+  # ─────────────────────────────────────────────────────
+  # BASE DE DATOS — PostgreSQL 18
+  # IMPORTANTE: en PG18 el path de datos cambió a
+  # /var/lib/postgresql/18/docker — el volumen va al padre
+  # ─────────────────────────────────────────────────────
+  postgres:
+    image: postgres:18-alpine
+    container_name: sgp_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       sgp_db
+      POSTGRES_USER:     sgp_user
+      POSTGRES_PASSWORD: sgp_password_2025
+    ports:
+      - "5432:5432"       # accesible desde el PC en localhost:5432
+    volumes:
+      - pgdata:/var/lib/postgresql                         # PG18: volumen al directorio padre
+      - ./database/migrations/001_create_tables.sql:/docker-entrypoint-initdb.d/01_tables.sql
+      - ./database/seeds/001_seed_data.sql:/docker-entrypoint-initdb.d/02_seed.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sgp_user -d sgp_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ─────────────────────────────────────────────────────
+  # BACKEND — Node.js + Express
+  # ─────────────────────────────────────────────────────
+  backend:
+    build: .
+    container_name: sgp_backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy   # espera a que Postgres esté listo
+    ports:
+      - "3000:3000"       # accesible desde el PC en localhost:3000
+    environment:
+      NODE_ENV:    development
+      PORT:        3000
+
+      # Conexión a la BD — usa el nombre del servicio "postgres" como host
+      DB_HOST:     postgres
+      DB_PORT:     5432
+      DB_NAME:     sgp_db
+      DB_USER:     sgp_user
+      DB_PASSWORD: sgp_password_2025
+
+      # JWT — cambia estos secretos en producción
+      JWT_SECRET:          sgp_jwt_secret_super_largo_2025_cambiar_en_produccion
+      JWT_EXPIRES_IN:      1h
+      JWT_REFRESH_SECRET:  sgp_refresh_secret_diferente_2025_cambiar_en_produccion
+      JWT_REFRESH_EXPIRES_IN: 7d
+
+      # Email — Mailtrap para desarrollo (gratis en mailtrap.io)
+      MAIL_HOST: smtp.mailtrap.io
+      MAIL_PORT: 2525
+      MAIL_USER:  tu_usuario_mailtrap
+      MAIL_PASS:  tu_password_mailtrap
+      MAIL_FROM:  noreply@sgp.com
+
+      FRONTEND_URL:        http://localhost:3000
+      OTP_EXPIRES_MINUTES: 5
+
+    volumes:
+      - ./src:/app/src    # hot reload: cambios en src se reflejan sin rebuildar
+
+# ─────────────────────────────────────────────────────
+# Volumen persistente para los datos de PostgreSQL 18
+# PG18 guarda los datos en /var/lib/postgresql/18/docker
+# el volumen apunta al directorio padre /var/lib/postgresql
+# ─────────────────────────────────────────────────────
+volumes:
+  pgdata:

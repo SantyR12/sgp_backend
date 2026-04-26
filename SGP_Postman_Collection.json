@@ -1,0 +1,101 @@
+{
+  "info": {
+    "name": "SGP Backend API",
+    "description": "Colección de endpoints para el backend del Sistema de Gestión de Prescripciones",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:3000/api" },
+    { "key": "access_token", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Global",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/health"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Autenticación",
+      "item": [
+        {
+          "name": "Login (Step 1)",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": "{{base_url}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"admin@sgp.com\",\n  \"contrasena\": \"Admin123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Verify OTP (Step 2)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if(jsonData.accessToken) { pm.collectionVariables.set(\"access_token\", jsonData.accessToken); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": "{{base_url}}/auth/verify-otp",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"admin@sgp.com\",\n  \"otp\": \"123456\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Historial",
+      "item": [
+        {
+          "name": "Buscar Pacientes",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{access_token}}" } ],
+            "url": {
+              "raw": "{{base_url}}/historial/pacientes/buscar?nombre=Juan",
+              "host": ["{{base_url}}"],
+              "path": ["historial", "pacientes", "buscar"],
+              "query": [ { "key": "nombre", "value": "Juan" } ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Medicamentos",
+      "item": [
+        {
+          "name": "Buscar Medicamento",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{access_token}}" } ],
+            "url": {
+              "raw": "{{base_url}}/medicamentos/buscar?q=ibu",
+              "host": ["{{base_url}}"],
+              "path": ["medicamentos", "buscar"],
+              "query": [ { "key": "q", "value": "ibu" } ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
