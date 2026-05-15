@@ -123,8 +123,27 @@ router.get('/paciente/:pacienteId', async (req, res) => {
   }
 });
 
-// Cancelar prescripción
+// Cancelar prescripción (Sprint 1)
 router.patch('/:id/cancelar',
+  authorize('medico'),
+  async (req, res) => {
+    try {
+      const result = await db.query(
+        `UPDATE prescripciones SET estado='cancelada' WHERE id=$1 RETURNING *`,
+        [req.params.id]
+      );
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: 'Prescripción no encontrada' });
+      }
+      res.json(formatPrescripcion(result.rows[0]));
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+  }
+);
+
+// PB-16 (Sprint 2): Suspender prescripción
+router.patch('/:id/suspender',
   authorize('medico'),
   async (req, res) => {
     try {

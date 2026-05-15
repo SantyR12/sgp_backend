@@ -108,7 +108,9 @@ async function resendVerificationEmail(correo) {
 
 async function login({ correo, contrasena }) {
   const result = await db.query(
-    'SELECT id, nombre, correo, contrasena_hash, rol, estado, intentos_fallidos FROM usuarios WHERE correo = $1',
+    `SELECT id, nombre, correo, contrasena_hash, rol, estado,
+            intentos_fallidos, bloqueado_hasta
+     FROM usuarios WHERE correo = $1`,
     [correo.toLowerCase()]
   );
 
@@ -125,26 +127,52 @@ async function login({ correo, contrasena }) {
     throw err;
   }
 
-  // PB-05 (Sprint 2): bloqueo por intentos — se puede activar aquí
+  // PB-05: bloqueo temporal por tiempo
+  if (user.bloqueado_hasta && new Date() < new Date(user.bloqueado_hasta)) {
+    const minutos = Math.ceil(
+      (new Date(user.bloqueado_hasta) - new Date()) / 60000
+    );
+    const err = new Error(`Cuenta bloqueada. Intente de nuevo en ${minutos} minuto(s).`);
+    err.status = 423;
+    err.bloqueadoHasta = user.bloqueado_hasta;
+    throw err;
+  }
+
   if (user.estado === 'bloqueado') {
     const err = new Error('Cuenta bloqueada. Contacta al administrador.');
-    err.status = 401;
+    err.status = 423;
     throw err;
   }
 
   const match = await bcrypt.compare(contrasena, user.contrasena_hash);
   if (!match) {
-    // Incrementar intentos fallidos
+    const nuevosIntentos = (user.intentos_fallidos || 0) + 1;
+
+    if (nuevosIntentos >= 5) {
+      // PB-05: bloquear por 30 minutos tras 5 intentos fallidos
+      const bloqueadoHasta = new Date(Date.now() + 30 * 60 * 1000);
+      await db.query(
+        `UPDATE usuarios
+         SET intentos_fallidos = $1, bloqueado_hasta = $2
+         WHERE id = $3`,
+        [nuevosIntentos, bloqueadoHasta, user.id]
+      );
+      const err = new Error('Cuenta bloqueada. Intente de nuevo en 30 minuto(s).');
+      err.status = 423;
+      err.bloqueadoHasta = bloqueadoHasta;
+      throw err;
+    }
+
     await db.query(
-      'UPDATE usuarios SET intentos_fallidos = intentos_fallidos + 1 WHERE id = $1',
-      [user.id]
+      'UPDATE usuarios SET intentos_fallidos = $1 WHERE id = $2',
+      [nuevosIntentos, user.id]
     );
     throw genericError;
   }
 
-  // Reset intentos fallidos en login exitoso
+  // Reset intentos fallidos y bloqueo en login exitoso
   await db.query(
-    'UPDATE usuarios SET intentos_fallidos = 0 WHERE id = $1',
+    'UPDATE usuarios SET intentos_fallidos = 0, bloqueado_hasta = NULL WHERE id = $1',
     [user.id]
   );
 

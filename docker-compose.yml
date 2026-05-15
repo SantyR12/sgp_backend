@@ -32,7 +32,8 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql                         # PG18: volumen al directorio padre
       - ./database/migrations/001_create_tables.sql:/docker-entrypoint-initdb.d/01_tables.sql
-      - ./database/seeds/001_seed_data.sql:/docker-entrypoint-initdb.d/02_seed.sql
+      - ./database/migrations/002_sprint2.sql:/docker-entrypoint-initdb.d/02_sprint2.sql
+      - ./database/seeds/001_seed_data.sql:/docker-entrypoint-initdb.d/03_seed.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U sgp_user -d sgp_db"]
       interval: 5s
@@ -77,10 +78,12 @@ services:
 
 
       FRONTEND_URL:        http://localhost:3000
+      BASE_URL:            http://localhost:3000
       OTP_EXPIRES_MINUTES: 5
 
     volumes:
-      - ./src:/app/src    # hot reload: cambios en src se reflejan sin rebuildar
+      - ./src:/app/src          # hot reload: cambios en src se reflejan sin rebuildar
+      - ./uploads:/app/uploads  # archivos adjuntos PB-13
 
 # ─────────────────────────────────────────────────────
 # Volumen persistente para los datos de PostgreSQL 18

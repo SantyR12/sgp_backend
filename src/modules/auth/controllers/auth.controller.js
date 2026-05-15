@@ -26,7 +26,10 @@ async function login(req, res) {
     const result = await authService.login(req.body);
     res.json(result);
   } catch (err) {
-    res.status(err.status || 500).json({ message: err.message });
+    // PB-05: incluir bloqueadoHasta en la respuesta 423
+    const body = { message: err.message };
+    if (err.bloqueadoHasta) body.bloqueadoHasta = err.bloqueadoHasta;
+    res.status(err.status || 500).json(body);
   }
 }
 
