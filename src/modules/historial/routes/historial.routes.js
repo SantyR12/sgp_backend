@@ -71,7 +71,9 @@ router.patch('/:id/archivar',
 );
 
 // PB-14: Buscar pacientes
-router.get('/pacientes/buscar',
+// Ruta accesible como GET /api/pacientes/buscar (alias en index.js)
+// o como GET /api/historial/pacientes/buscar
+router.get('/buscar',
   [
     query('nombre').optional().isString(),
     query('documento').optional().isString(),
