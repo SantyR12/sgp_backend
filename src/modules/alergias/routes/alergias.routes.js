@@ -2,12 +2,15 @@
 // ALERGIAS SERVICE + ROUTES — PB-20
 // ══════════════════════════════════════════════════════════════════════════════
 
-const express = require('express');
-const { body, query } = require('express-validator');
-const { v4: uuidv4 } = require('uuid');
-const db = require('../../../config/db');
-const { authenticate, authorize } = require('../../../middleware/auth.middleware');
-const { validate } = require('../../../middleware/validate.middleware');
+const express = require("express");
+const { body, query } = require("express-validator");
+const { v4: uuidv4 } = require("uuid");
+const db = require("../../../config/db");
+const {
+  authenticate,
+  authorize,
+} = require("../../../middleware/auth.middleware");
+const { validate } = require("../../../middleware/validate.middleware");
 
 const router = express.Router();
 router.use(authenticate);
@@ -16,21 +19,35 @@ router.use(authenticate);
 // PB-20: Crear alergia
 // ─────────────────────────────────────────────────────────────────────────────
 
-router.post('/',
-  authorize('medico', 'enfermero'),
+router.post(
+  "/",
+  authorize("medico", "enfermero"),
   [
-    body('pacienteId').notEmpty(),
-    body('agenteCausante').trim().notEmpty().withMessage('El agente causante es obligatorio'),
-    body('tipoReaccion')
-      .isIn(['anafilaxia', 'urticaria', 'angioedema', 'intolerancia', 'otra']),
-    body('severidad')
-      .isIn(['leve', 'moderada', 'grave', 'mortal']),
+    body("pacienteId").notEmpty(),
+    body("agenteCausante")
+      .trim()
+      .notEmpty()
+      .withMessage("El agente causante es obligatorio"),
+    body("tipoReaccion").isIn([
+      "anafilaxia",
+      "urticaria",
+      "angioedema",
+      "intolerancia",
+      "otra",
+    ]),
+    body("severidad").isIn(["leve", "moderada", "grave", "mortal"]),
   ],
   validate,
   async (req, res) => {
     try {
-      const { pacienteId, agenteCausante, tipoReaccion, severidad,
-              fechaDiagnostico, observaciones } = req.body;
+      const {
+        pacienteId,
+        agenteCausante,
+        tipoReaccion,
+        severidad,
+        fechaDiagnostico,
+        observaciones,
+      } = req.body;
 
       const result = await db.query(
         `INSERT INTO alergias
@@ -38,19 +55,27 @@ router.post('/',
             estado, fecha_diagnostico, observaciones, creado_por, creado_en)
          VALUES ($1,$2,$3,$4,$5,'activa',$6,$7,$8,NOW())
          RETURNING *`,
-        [uuidv4(), pacienteId, agenteCausante, tipoReaccion, severidad,
-         fechaDiagnostico || null, observaciones || null, req.user.userId]
+        [
+          uuidv4(),
+          pacienteId,
+          agenteCausante,
+          tipoReaccion,
+          severidad,
+          fechaDiagnostico || null,
+          observaciones || null,
+          req.user.userId,
+        ],
       );
 
       res.status(201).json(formatAlergia(result.rows[0]));
     } catch (err) {
       res.status(500).json({ message: err.message });
     }
-  }
+  },
 );
 
 // Listar alergias de un paciente
-router.get('/paciente/:pacienteId', async (req, res) => {
+router.get("/paciente/:pacienteId", async (req, res) => {
   try {
     const result = await db.query(
       `SELECT a.*, u.nombre AS creado_por_nombre
@@ -58,7 +83,7 @@ router.get('/paciente/:pacienteId', async (req, res) => {
        LEFT JOIN usuarios u ON u.id = a.creado_por
        WHERE a.paciente_id = $1
        ORDER BY a.creado_en DESC`,
-      [req.params.pacienteId]
+      [req.params.pacienteId],
     );
     res.json(result.rows.map(formatAlergia));
   } catch (err) {
@@ -67,38 +92,39 @@ router.get('/paciente/:pacienteId', async (req, res) => {
 });
 
 // PB-20 criterio 3: Cambiar estado (solo médicos)
-router.patch('/:id/estado',
-  authorize('medico'),
-  [body('estado').isIn(['activa', 'inactiva'])],
+router.patch(
+  "/:id/estado",
+  authorize("medico"),
+  [body("estado").isIn(["activa", "inactiva"])],
   validate,
   async (req, res) => {
     try {
       const result = await db.query(
         `UPDATE alergias SET estado=$1 WHERE id=$2 RETURNING *`,
-        [req.body.estado, req.params.id]
+        [req.body.estado, req.params.id],
       );
       if (result.rows.length === 0) {
-        return res.status(404).json({ message: 'Alergia no encontrada' });
+        return res.status(404).json({ message: "Alergia no encontrada" });
       }
       res.json(formatAlergia(result.rows[0]));
     } catch (err) {
       res.status(500).json({ message: err.message });
     }
-  }
+  },
 );
 
 // PB-20 criterio 3 / PB-15 criterio 3: Verificar alerta de alergia
-router.get('/alerta', async (req, res) => {
+router.get("/alerta", async (req, res) => {
   try {
     const { pacienteId, medicamentoId } = req.query;
 
     // Buscar el nombre del medicamento
     const med = await db.query(
-      'SELECT nombre_generico, nombre_comercial FROM medicamentos WHERE id=$1',
-      [medicamentoId]
+      "SELECT nombre_generico, nombre_comercial FROM medicamentos WHERE id=$1",
+      [medicamentoId],
     );
-    const medNombre = med.rows[0]?.nombre_generico || '';
-    const medComercial = med.rows[0]?.nombre_comercial || '';
+    const medNombre = med.rows[0]?.nombre_generico || "";
+    const medComercial = med.rows[0]?.nombre_comercial || "";
 
     // Buscar alergia activa que coincida con el nombre del medicamento
     const result = await db.query(
@@ -110,7 +136,7 @@ router.get('/alerta', async (req, res) => {
            OR LOWER(agente_causante) LIKE LOWER($3)
          )
        LIMIT 1`,
-      [pacienteId, `%${medNombre}%`, `%${medComercial}%`]
+      [pacienteId, `%${medNombre}%`, `%${medComercial}%`],
     );
 
     if (result.rows.length > 0) {

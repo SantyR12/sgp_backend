@@ -82,15 +82,15 @@ router.post('/',
       const result = await db.query(
         `INSERT INTO prescripciones
            (id, paciente_id, medico_id, medico_nombre, medicamento_id,
-            medicamento_nombre, dosis, dosis_unidad, frecuencia_horas,
+            medicamento_nombre, dosis, dosis_unidad, dosis_texto, frecuencia_horas,
             via_administracion, duracion_dias, indicaciones_especiales,
             estado, fecha_prescripcion, firma_digital)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'activa',NOW(),$13)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'activa',NOW(),$14)
          RETURNING *`,
         [
           uuidv4(), pacienteId, req.user.userId, medicoNombre,
           medicamentoId, medicamentoNombre, dosis, dosisUnidad,
-          frecuenciaHoras, viaAdministracion, duracionDias,
+          `${dosis} ${dosisUnidad}`, frecuenciaHoras, viaAdministracion, duracionDias,
           indicacionesEspeciales || null, firmaDigital,
         ]
       );
@@ -123,8 +123,27 @@ router.get('/paciente/:pacienteId', async (req, res) => {
   }
 });
 
-// Cancelar prescripción
+// Cancelar prescripción (Sprint 1)
 router.patch('/:id/cancelar',
+  authorize('medico'),
+  async (req, res) => {
+    try {
+      const result = await db.query(
+        `UPDATE prescripciones SET estado='cancelada' WHERE id=$1 RETURNING *`,
+        [req.params.id]
+      );
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: 'Prescripción no encontrada' });
+      }
+      res.json(formatPrescripcion(result.rows[0]));
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+  }
+);
+
+// PB-16 (Sprint 2): Suspender prescripción
+router.patch('/:id/suspender',
   authorize('medico'),
   async (req, res) => {
     try {

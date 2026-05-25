@@ -83,6 +83,12 @@ router.post('/refresh',
   controller.refresh
 );
 
+// ── Listado de usuarios (solo admin) ─────────────────────────────────────────
+router.get('/usuarios', authenticate, authorize('admin'), controller.getUsers);
+
+// ── PB-05: Desbloquear usuario (solo admin) ───────────────────────────────────
+router.patch('/usuarios/:id/desbloquear', authenticate, authorize('admin'), controller.unblockUser);
+
 // ── Logout ───────────────────────────────────────────────────────────────────
 router.post('/logout',
   [body('refreshToken').notEmpty()],
