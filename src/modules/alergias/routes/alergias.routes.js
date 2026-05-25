@@ -53,7 +53,11 @@ router.post('/',
 router.get('/paciente/:pacienteId', async (req, res) => {
   try {
     const result = await db.query(
-      'SELECT * FROM alergias WHERE paciente_id=$1 ORDER BY creado_en DESC',
+      `SELECT a.*, u.nombre AS creado_por_nombre
+       FROM alergias a
+       LEFT JOIN usuarios u ON u.id = a.creado_por
+       WHERE a.paciente_id = $1
+       ORDER BY a.creado_en DESC`,
       [req.params.pacienteId]
     );
     res.json(result.rows.map(formatAlergia));
@@ -136,7 +140,7 @@ function formatAlergia(r) {
     fechaDiagnostico: r.fecha_diagnostico,
     observaciones: r.observaciones,
     creadoEn: r.creado_en,
-    creadoPor: r.creado_por,
+    creadoPor: r.creado_por_nombre || r.creado_por,
   };
 }
 
