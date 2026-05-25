@@ -39,7 +39,7 @@ router.post('/resend-verification',
   controller.resendVerification
 );
 
-// ── PB-03: Login ─────────────────────────────────────────────────────────────
+// ── PB-03: Login (responde 423 con bloqueadoHasta si la cuenta está bloqueada)
 router.post('/login',
   loginLimiter,
   [
@@ -47,7 +47,20 @@ router.post('/login',
     body('contrasena').notEmpty().withMessage('La contraseña es obligatoria'),
   ],
   validate,
-  controller.login
+  async (req, res, next) => {
+    try {
+      const result = await require('../services/auth.service').login(req.body);
+      res.json(result);
+    } catch (err) {
+      if (err.status === 423) {
+        return res.status(423).json({
+          message: err.message,
+          bloqueadoHasta: err.bloqueadoHasta,
+        });
+      }
+      next(err);
+    }
+  }
 );
 
 // ── PB-04: Verificar OTP ─────────────────────────────────────────────────────
@@ -75,6 +88,13 @@ router.post('/logout',
   [body('refreshToken').notEmpty()],
   validate,
   controller.logout
+);
+
+// ── PB-05: Desbloquear usuario (solo admins) ─────────────────────────────────
+router.patch('/usuarios/:id/desbloquear',
+  authenticate,
+  authorize('admin'),
+  controller.unblockUser
 );
 
 module.exports = router;

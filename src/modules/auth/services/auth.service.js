@@ -108,7 +108,7 @@ async function resendVerificationEmail(correo) {
 
 async function login({ correo, contrasena }) {
   const result = await db.query(
-    'SELECT id, nombre, correo, contrasena_hash, rol, estado, intentos_fallidos FROM usuarios WHERE correo = $1',
+    'SELECT id, nombre, correo, contrasena_hash, rol, estado, intentos_fallidos, bloqueado_hasta FROM usuarios WHERE correo = $1',
     [correo.toLowerCase()]
   );
 
@@ -125,26 +125,49 @@ async function login({ correo, contrasena }) {
     throw err;
   }
 
-  // PB-05 (Sprint 2): bloqueo por intentos — se puede activar aquí
+  // PB-05: bloqueo temporal de 15 minutos tras 5 intentos fallidos
   if (user.estado === 'bloqueado') {
-    const err = new Error('Cuenta bloqueada. Contacta al administrador.');
-    err.status = 401;
-    throw err;
+    const bloqueadoHasta = user.bloqueado_hasta ? new Date(user.bloqueado_hasta) : null;
+    if (bloqueadoHasta && bloqueadoHasta > new Date()) {
+      const err = new Error('Cuenta bloqueada. Intente de nuevo en 15 minuto(s).');
+      err.status = 423;
+      err.bloqueadoHasta = bloqueadoHasta.toISOString();
+      throw err;
+    }
+    // Bloqueo expirado — desbloquear automáticamente
+    await db.query(
+      "UPDATE usuarios SET estado = 'activo', intentos_fallidos = 0, bloqueado_hasta = NULL WHERE id = $1",
+      [user.id]
+    );
+    user.estado = 'activo';
+    user.intentos_fallidos = 0;
   }
 
   const match = await bcrypt.compare(contrasena, user.contrasena_hash);
   if (!match) {
-    // Incrementar intentos fallidos
+    const intentos = user.intentos_fallidos + 1;
+    if (intentos >= 5) {
+      // Bloquear cuenta 15 minutos (PB-05)
+      const bloqueadoHasta = new Date(Date.now() + 15 * 60 * 1000);
+      await db.query(
+        "UPDATE usuarios SET intentos_fallidos = $1, estado = 'bloqueado', bloqueado_hasta = $2 WHERE id = $3",
+        [intentos, bloqueadoHasta, user.id]
+      );
+      const err = new Error('Cuenta bloqueada. Intente de nuevo en 15 minuto(s).');
+      err.status = 423;
+      err.bloqueadoHasta = bloqueadoHasta.toISOString();
+      throw err;
+    }
     await db.query(
-      'UPDATE usuarios SET intentos_fallidos = intentos_fallidos + 1 WHERE id = $1',
-      [user.id]
+      'UPDATE usuarios SET intentos_fallidos = $1 WHERE id = $2',
+      [intentos, user.id]
     );
     throw genericError;
   }
 
   // Reset intentos fallidos en login exitoso
   await db.query(
-    'UPDATE usuarios SET intentos_fallidos = 0 WHERE id = $1',
+    "UPDATE usuarios SET intentos_fallidos = 0, estado = 'activo', bloqueado_hasta = NULL WHERE id = $1",
     [user.id]
   );
 
@@ -296,6 +319,22 @@ async function logout(refreshToken) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PB-05: Desbloquear usuario (solo admins)
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function unblockUser(userId) {
+  const result = await db.query(
+    "UPDATE usuarios SET estado = 'activo', intentos_fallidos = 0, bloqueado_hasta = NULL WHERE id = $1 RETURNING id",
+    [userId]
+  );
+  if (result.rows.length === 0) {
+    const err = new Error('Usuario no encontrado');
+    err.status = 404;
+    throw err;
+  }
+}
+
 module.exports = {
   createUser,
   resendVerificationEmail,
@@ -303,4 +342,5 @@ module.exports = {
   verifyOtp,
   refreshAccessToken,
   logout,
+  unblockUser,
 };

@@ -60,4 +60,14 @@ async function logout(req, res) {
   }
 }
 
-module.exports = { createUser, resendVerification, login, verifyOtp, refresh, logout };
+// PB-05: Desbloquear usuario (solo admins)
+async function unblockUser(req, res) {
+  try {
+    await authService.unblockUser(req.params.id);
+    res.json({ message: 'Usuario desbloqueado correctamente' });
+  } catch (err) {
+    res.status(err.status || 500).json({ message: err.message });
+  }
+}
+
+module.exports = { createUser, resendVerification, login, verifyOtp, refresh, logout, unblockUser };
