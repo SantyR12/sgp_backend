@@ -23,8 +23,9 @@ CREATE TABLE IF NOT EXISTS usuarios (
   otp_code                    VARCHAR(6),
   otp_expiry                  TIMESTAMP,
   otp_intentos                INTEGER DEFAULT 0,
-  -- Seguridad (PB-05 Sprint 2)
+  -- Seguridad (PB-05)
   intentos_fallidos           INTEGER DEFAULT 0,
+  bloqueado_hasta             TIMESTAMP,
   -- Auditoría
   creado_por                  UUID REFERENCES usuarios(id),
   creado_en                   TIMESTAMP DEFAULT NOW()
