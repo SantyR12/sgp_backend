@@ -6,6 +6,7 @@ async function createUser(req, res) {
     const user = await authService.createUser(req.body, req.user.userId);
     res.status(201).json(user);
   } catch (err) {
+    console.error('[createUser ERROR]', err.status, err.message, err.stack?.split('\n')[1]);
     res.status(err.status || 500).json({ message: err.message });
   }
 }
@@ -63,4 +64,23 @@ async function logout(req, res) {
   }
 }
 
-module.exports = { createUser, resendVerification, login, verifyOtp, refresh, logout };
+async function getUsers(req, res) {
+  try {
+    const users = await authService.getUsers();
+    res.json(users);
+  } catch (err) {
+    res.status(err.status || 500).json({ message: err.message });
+  }
+}
+
+// PB-05: Desbloquear usuario
+async function unblockUser(req, res) {
+  try {
+    const user = await authService.unblockUser(req.params.id);
+    res.json(user);
+  } catch (err) {
+    res.status(err.status || 500).json({ message: err.message });
+  }
+}
+
+module.exports = { createUser, resendVerification, login, verifyOtp, refresh, logout, getUsers, unblockUser };

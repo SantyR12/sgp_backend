@@ -42,16 +42,15 @@ async function createUser({ nombre, correo, contrasenaTemp, rol }, creadorId) {
   }
 
   const hash = await bcrypt.hash(contrasenaTemp, 12);
-  const verificationToken = uuidv4();
-  const tokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
 
+  // El admin crea usuarios con estado 'activo' directamente —
+  // no requieren verificación de correo porque el admin asigna la contraseña temporal.
   const result = await db.query(
     `INSERT INTO usuarios
-       (id, nombre, correo, contrasena_hash, rol, estado, verification_token, verification_token_expiry, creado_por)
-     VALUES ($1,$2,$3,$4,$5,'pendiente',$6,$7,$8)
+       (id, nombre, correo, contrasena_hash, rol, estado, creado_por)
+     VALUES ($1,$2,$3,$4,$5,'activo',$6)
      RETURNING id, nombre, correo, rol, estado, creado_en`,
-    [uuidv4(), nombre, correo.toLowerCase(), hash, rol,
-     verificationToken, tokenExpiry, creadorId]
+    [uuidv4(), nombre, correo.toLowerCase(), hash, rol, creadorId]
   );
 
   const usuario = result.rows[0];
@@ -62,9 +61,6 @@ async function createUser({ nombre, correo, contrasenaTemp, rol }, creadorId) {
      VALUES ('CREATE_USER', 'usuarios', $1, $2)`,
     [usuario.id, creadorId]
   );
-
-  // Enviar correo de verificación (PB-02)
-  await sendVerificationEmail(correo, nombre, verificationToken);
 
   return usuario;
 }
@@ -149,15 +145,15 @@ async function login({ correo, contrasena }) {
     const nuevosIntentos = (user.intentos_fallidos || 0) + 1;
 
     if (nuevosIntentos >= 5) {
-      // PB-05: bloquear por 30 minutos tras 5 intentos fallidos
-      const bloqueadoHasta = new Date(Date.now() + 30 * 60 * 1000);
+      // PB-05: bloquear por 15 minutos tras 5 intentos fallidos
+      const bloqueadoHasta = new Date(Date.now() + 15 * 60 * 1000);
       await db.query(
         `UPDATE usuarios
          SET intentos_fallidos = $1, bloqueado_hasta = $2
          WHERE id = $3`,
         [nuevosIntentos, bloqueadoHasta, user.id]
       );
-      const err = new Error('Cuenta bloqueada. Intente de nuevo en 30 minuto(s).');
+      const err = new Error('Cuenta bloqueada. Intente de nuevo en 15 minuto(s).');
       err.status = 423;
       err.bloqueadoHasta = bloqueadoHasta;
       throw err;
@@ -324,6 +320,32 @@ async function logout(refreshToken) {
   );
 }
 
+async function getUsers() {
+  const result = await db.query(
+    `SELECT id, nombre, correo, rol, estado, creado_en AS "creadoEn"
+     FROM usuarios
+     ORDER BY rol, nombre`
+  );
+  return result.rows;
+}
+
+// PB-05: Desbloquear usuario (solo admin)
+async function unblockUser(userId) {
+  const result = await db.query(
+    `UPDATE usuarios
+     SET estado = 'activo', intentos_fallidos = 0, bloqueado_hasta = NULL
+     WHERE id = $1
+     RETURNING id, nombre, correo, rol, estado`,
+    [userId]
+  );
+  if (result.rows.length === 0) {
+    const err = new Error('Usuario no encontrado');
+    err.status = 404;
+    throw err;
+  }
+  return result.rows[0];
+}
+
 module.exports = {
   createUser,
   resendVerificationEmail,
@@ -331,4 +353,6 @@ module.exports = {
   verifyOtp,
   refreshAccessToken,
   logout,
+  getUsers,
+  unblockUser,
 };
